@@ -1,7 +1,7 @@
 # Unattended scanner
 
 `scan.py --loop-min 350` runs in GitHub Actions (`.github/workflows/scanner.yml`)
-Mon–Fri 07:00–20:45 UTC. It wakes every 30 s and scans each 5m candle within ~30 s
+Mon–Fri 07:00–20:45 UTC. It wakes every second and scans each 5m candle within seconds
 of its close. When it finds a setup it opens a GitHub issue assigned to the repo
 owner, which the GitHub mobile app sends to your phone as a push notification.
 That uses ~14 h of runner time a day: free if the repo is **public**, about

@@ -10,8 +10,8 @@ Hard gates: weekend/stale data, 20:45-22:00 UTC rollover, 5m ATR > 8, 15m ATR > 
 stop wider than MAX_RISK. Short stops include spread (they trigger on the ask).
 
 Usage: python3 scanner/scan.py [--lookback-min 20] [--dry-run]       one scan
-       python3 scanner/scan.py --loop-min 350 [--poll 30]              live loop: checks every
-                                                                       30 s, scans each 5m close
+       python3 scanner/scan.py --loop-min 350 [--poll 1]               live loop: wakes every
+                                                                       second, scans each 5m close
 Env:   TWELVE_DATA_API_KEY (required); GITHUB_TOKEN + GITHUB_REPOSITORY to open an issue
        per alert. SPREAD (default 2.5).
 Out:   appends new signals to signals/log.csv. Exit 2 = gate/no data, 1 = fetch failure.
@@ -174,6 +174,17 @@ def notify(alerts):
             print(f"ERROR could not open issue: {e}")
 
 
+_H1 = {"hour": None, "data": None}
+
+
+def h1_cached(key, now):
+    """1h candles change once an hour; refetch only then (saves Twelve Data credits)."""
+    hour = now.replace(minute=0, second=0, microsecond=0)
+    if _H1["hour"] != hour:
+        _H1["data"], _H1["hour"] = candles("1h", 40, key), hour
+    return _H1["data"]
+
+
 def run_once(key, lookback_min, dry_run=False):
     """Scan recently closed 5m candles. Returns (exit_code, last_closed_candle_time)."""
     now = datetime.now(timezone.utc)
@@ -181,7 +192,7 @@ def run_once(key, lookback_min, dry_run=False):
     if 20 * 60 + 45 <= mins < 22 * 60:
         print("GATE rollover window 20:45-22:00 UTC"); return 2, None
     try:
-        m5, h1, tv = candles("5min", 60, key), candles("1h", 40, key), tradingview()
+        m5, h1, tv = candles("5min", 60, key), h1_cached(key, now), tradingview()
     except Exception as e:
         print(f"ERROR fetch failed: {e}"); return 1, None
     m5 = [c for c in m5 if c["t"] + timedelta(minutes=5) <= now]   # closed candles only
@@ -216,26 +227,30 @@ def run_once(key, lookback_min, dry_run=False):
 
 
 def loop(key, poll, minutes, dry_run):
-    """Poll the live price every `poll` s; scan as soon as each 5m candle has closed."""
+    """Wake every `poll` s; scan as soon as each 5m candle has closed.
+    Retries a not-yet-updated candle feed every RETRY s (Twelve Data free tier: 8 req/min)."""
+    RETRY = 10
     end = time.time() + minutes * 60
-    scanned, fails = None, 0
+    scanned, fails, next_try = None, 0, 0.0
     while time.time() < end:
         now = datetime.now(timezone.utc)
         if 20 * 60 + 45 <= now.hour * 60 + now.minute < 22 * 60:
             print("STOP rollover window"); return 0
         closed = now.replace(second=0, microsecond=0) - timedelta(minutes=now.minute % 5 + 5)
-        if closed != scanned:
+        if closed != scanned and time.time() >= next_try:
             code, last = run_once(key, 15 if scanned is None else 10, dry_run)
+            next_try = time.time() + RETRY
             if code == 1:
                 fails += 1
                 if fails >= 5:
                     return 1
+                next_try = time.time() + 30 * fails
             else:
                 fails = 0
             if code == 2 and last is None:
                 return 0                       # market closed / stale
             if last is not None and last >= closed:
-                scanned = closed               # else Twelve Data not updated yet: retry next poll
+                scanned = closed               # else feed not updated yet: retry in RETRY s
         time.sleep(poll)
     return 0
 

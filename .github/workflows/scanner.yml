@@ -1,6 +1,6 @@
 name: XAUUSD scanner
 
-# Live loop: wakes every 30 s and scans each 5m candle as soon as it closes.
+# Live loop: wakes every second and scans each 5m candle as soon as it closes.
 # Mon-Fri 07:00-20:45 UTC in three back-to-back jobs (max job length is 6 h); the
 # concurrency group queues each job behind the previous one, so there is no gap.
 # ~14 h/day of runner time: free on a PUBLIC repo, far over the 2,000 free min on a private one.
@@ -26,12 +26,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Scan every 30 s (alerts open an issue -> GitHub mobile push)
+      - name: Scan live (1 s clock) (alerts open an issue -> GitHub mobile push)
         env:
           TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
           SPREAD: ${{ vars.SPREAD || '2.5' }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: python3 scanner/scan.py --loop-min 350 --poll 30
+        run: python3 scanner/scan.py --loop-min 350 --poll 1
 
       - name: Save signal log
         if: always()
