@@ -157,19 +157,21 @@ def fmt(s):
             f"{MAX_DRIFT} pts of entry. Breakeven at +3 (shorts: SL to entry+2.5).")
 
 
-def notify(alerts):
+def notify(alerts, prefix=""):
     """Open a GitHub issue per alert (assigned to the owner -> GitHub mobile push)."""
     token, repo = os.environ.get("GITHUB_TOKEN"), os.environ.get("GITHUB_REPOSITORY")
     if not token or not repo:
         return
     for s in alerts:
         body = fmt(s) + "\n\n_Rule-based scanner, not financial advice. Check news/calendar._"
+        body = prefix + body
         data = json.dumps({"title": body.split("\n")[0], "body": body,
                            "assignees": [repo.split("/")[0]]}).encode()
         req = urllib.request.Request(f"https://api.github.com/repos/{repo}/issues", data=data, headers={
             "Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"})
         try:
             urllib.request.urlopen(req, timeout=20).close()
+            print(f"issue opened: {body.splitlines()[0]}")
         except Exception as e:
             print(f"ERROR could not open issue: {e}")
 
@@ -261,7 +263,16 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--loop-min", type=int, default=0, help="keep polling for N minutes")
     ap.add_argument("--poll", type=int, default=30, help="seconds between live checks in loop mode")
+    ap.add_argument("--test-alert", action="store_true", help="open one fake alert issue at the live price")
     a = ap.parse_args()
+    if a.test_alert:
+        live = tradingview()["close"]
+        now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+        c = {"t": now, "o": live, "h": live + 1, "l": live - 4, "c": live}
+        s = make("LONG", "TEST", c, live - 3, "UP", "TEST ALERT - not a real setup, do not trade")
+        s["live"] = round(live, 2)
+        notify([s], prefix="🧪 TEST - ")
+        return 0
     key = os.environ.get("TWELVE_DATA_API_KEY")
     if not key:
         print("ERROR TWELVE_DATA_API_KEY not set"); return 1

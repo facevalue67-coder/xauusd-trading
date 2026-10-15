@@ -10,13 +10,18 @@ on:
     - cron: "45 12 * * 1-5"
     - cron: "30 18 * * 1-5"
   workflow_dispatch:
+    inputs:
+      test_alert:
+        description: "Only send one test alert to your phone (no scanning)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
   issues: write
 
 concurrency:
-  group: scanner
+  group: scanner-${{ inputs.test_alert && 'test' || 'live' }}
   cancel-in-progress: false
 
 jobs:
@@ -26,7 +31,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Send test alert
+        if: inputs.test_alert
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scanner/scan.py --test-alert
+
       - name: Scan live (1 s clock) (alerts open an issue -> GitHub mobile push)
+        if: ${{ !inputs.test_alert }}
         env:
           TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
           SPREAD: ${{ vars.SPREAD || '2.5' }}
