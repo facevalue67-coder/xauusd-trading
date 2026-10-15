@@ -1,0 +1,46 @@
+name: XAUUSD scanner
+
+# Every 15 min, Mon-Fri 07:00-20:45 UTC (London + NY, skips Asian session and rollover).
+# ~56 runs/day x ~1 billed min = ~1,250 of the 2,000 free private-repo minutes per month.
+# GitHub runs scheduled workflows only from the default branch and may start them late.
+on:
+  schedule:
+    - cron: "*/15 7-20 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: scanner
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan
+        env:
+          TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
+          SPREAD: ${{ vars.SPREAD || '2.5' }}
+        run: python3 scanner/scan.py --lookback-min 25 || [ $? -eq 2 ]
+
+      - name: Alert (opens an issue -> GitHub mobile push)
+        if: hashFiles('signals.md') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="$(head -n1 signals.md)"
+          gh issue create --title "$title" --body-file signals.md --assignee "${{ github.repository_owner }}"
+
+      - name: Save signal log
+        run: |
+          git add signals/log.csv 2>/dev/null || exit 0
+          git diff --cached --quiet && exit 0
+          git -c user.name=xau-scanner -c user.email=actions@users.noreply.github.com \
+            commit -m "scanner: log signals [skip ci]"
+          git pull --rebase -q && git push -q
