@@ -416,9 +416,24 @@ Rule: Experience log is for factual outcomes and lessons only. Do not rewrite pa
 - What Failed: Plain rejection (no sweep) taken against the 1h trend at London open; short SL was only ~2.4 chart-pts above the wick high, i.e. ~0 after spread; SL widened mid-trade (bigger loss, same outcome)
 - Lesson: Counter-trend trades only on a confirmed stop-hunt sweep, never a plain rejection; short stops need wick high + 1 + spread; never widen a stop.
 
-### Running Review - 2026-10-15 (5 trades)
-- Wins: 2 (#2 TP1, #3 TP2) | Losses: 2 (#1, #5) | Breakeven: 1 (#4) | Missed fills: 2 (pending limit orders)
-- Gross points: about -5.5 +5 +10 0 -7 = +2.5
+### Trade #6 - 2026-10-15 13:35 UTC
+- Session: London-NY overlap
+- Direction: BUY
+- Setup Type: Breakout Pullback / retest WITH 1h uptrend (dip into 4150-4151 EMA cluster, 5m closed 4153.46)
+- Entry: ~4153.5 (market, immediately)
+- Stop Loss: 4147.5 (6 points)
+- TP1 / TP2: 4158.5 / 4163.5
+- Outcome: TP1 (closed by user at ~4158.5 within ~2 min)
+- Net Result (points): +5 gross (~+2 to +3 net of spread)
+- Key Context: post-US-data (12:30 jobless claims) whipsaw 4130-4168; 5m ATR gate (>8) paused signals 13:20-13:30, signal fired once ATR dipped to ~7.9; 1h trend up
+- What Worked: Waited out the news chop and the ATR gate; with-trend retest (the backtest's best group); market entry filled at the signal price
+- What Failed: Nothing on the trade; ATR was still near the 8 limit, so the move was fast in both directions
+- Lesson: With-trend pullbacks to the 5m EMA cluster after a news spike settles are clean - and TP1 hits fast in high ATR, so take it.
+
+### Running Review - 2026-10-15 (6 trades)
+- Wins: 3 (#2 TP1, #3 TP2, #6 TP1) | Losses: 2 (#1, #5) | Breakeven: 1 (#4) | Missed fills: 2 (pending limit orders)
+- Gross points: about -5.5 +5 +10 0 -7 +5 = +7.5 (net of ~2.5 spread x 6 trades: about -7.5)
+- Backtest warning (scanner/backtest.py, 173 trades, 2026-09-28 to 10-15): -1.85 pts/trade at 2.5 spread; best group = with-trend retests; edge depends on real spread
 - Best setup: Stop Hunt Reversal (sweep + close back) - 2/2 wins
 - Worst setup: entering at an obvious level without a sweep (#1) or against the 1h trend without a sweep (#5) - 0/2
 - Rule adjustments: (1) counter-trend = sweeps only; (2) short SL = wick high + 1 + spread; (3) never widen SL; (4) market orders on signal, no pending limits; (5) shorts: breakeven at +4 to entry + 2.5
