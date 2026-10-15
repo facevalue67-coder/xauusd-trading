@@ -30,7 +30,7 @@ def signal(side, entry, sl, note):
     sys.exit(0)
 
 bucket, last, broke, fails, same, last_beat = None, None, False, 0, 0, 0
-say("START Oct15 #2: pullback long 4144.5/4146.5 | sweep short 4162.5/4159.5 | no signals 12:15-12:45")
+say("START Oct15 #3: pullback long 4151/4153 | sweep short 4163.5/4160 | no signals 12:15-12:45")
 while True:
     now = datetime.now(timezone.utc)
     if now.hour >= 21 or (now.hour == 20 and now.minute >= 45):
@@ -51,14 +51,14 @@ while True:
             pass  # US data window - no signals
         elif last["ATR|5"] and last["ATR|5"] > 8:
             say(f"GATE 5m ATR {last['ATR|5']:.2f} > 8 - no trade")
-        elif l <= 4144.5 and c >= 4146.5:
-            signal("LONG", c, min(l - 1.0, c - 6.0), "retest of broken 4145 resistance as support, WITH 1h uptrend")
-        elif h >= 4162.5 and c <= 4159.5:
+        elif l <= 4151.0 and c >= 4153.0:
+            signal("LONG", c, min(l - 1.0, c - 6.0), "pullback to 4150-4151 (5m EMA10 + morning breakout), WITH 1h uptrend")
+        elif h >= 4163.5 and c <= 4160.0:
             signal("SHORT", c, max(h + 3.5, c + 6.0), "stop-hunt sweep of day high 4161.8, COUNTER-TREND (sweep only) - SL incl. spread")
-        elif c >= 4155.0:
-            say(f"EXTENDED 5m closed {c:.2f} above 4155 - no chase, reassess - rally extending, reassess"); sys.exit(0)
-        elif c <= 4139.0:
-            say(f"DROP 5m closed {c:.2f} below 4139 - bounce failed, reassess"); sys.exit(0)
+        elif c >= 4165.0:
+            say(f"NEW HIGH 5m closed {c:.2f} above 4165 - reassess - rally extending, reassess"); sys.exit(0)
+        elif c <= 4146.0:
+            say(f"DROP 5m closed {c:.2f} below 4146 - bounce failed, reassess"); sys.exit(0)
     bucket = b
 
     same = same + 1 if last and s["close|5"] == last["close|5"] else 0
