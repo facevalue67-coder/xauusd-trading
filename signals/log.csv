@@ -1,0 +1,4 @@
+time,side,setup,level,entry,sl,risk,tp1,tp2,trend,with_trend,note,live,status,live,status
+2026-10-15 17:15,LONG,SWEEP,4150.5,4151.04,4145.8,5.2,4156.04,4161.04,UP,True,"swept swing low 4150.50 to 4146.80, closed back above",4150.57,skip: with-trend sweep (worst in backtest),4150.57,skip: with-trend sweep (worst in backtest)
+2026-10-15 18:00,LONG,RETEST,4153.0,4155.26,4150.26,5.0,4160.26,4165.26,UP,True,broken high 4153.00 retested as support,4158.29,skip: price moved +3.0 since signal,4158.29,skip: price moved +3.0 since signal
+2026-10-15 18:10,LONG,RETEST,4154.72,4156.03,4151.03,5.0,4161.03,4166.03,UP,True,broken high 4154.72 retested as support,4155.13,ALERT,4155.13,ALERT
