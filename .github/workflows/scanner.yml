@@ -1,11 +1,14 @@
 name: XAUUSD scanner
 
-# Every 15 min, Mon-Fri 07:00-20:45 UTC (London + NY, skips Asian session and rollover).
-# ~56 runs/day x ~1 billed min = ~1,250 of the 2,000 free private-repo minutes per month.
-# GitHub runs scheduled workflows only from the default branch and may start them late.
+# Live loop: wakes every 30 s and scans each 5m candle as soon as it closes.
+# Mon-Fri 07:00-20:45 UTC in three back-to-back jobs (max job length is 6 h); the
+# concurrency group queues each job behind the previous one, so there is no gap.
+# ~14 h/day of runner time: free on a PUBLIC repo, far over the 2,000 free min on a private one.
 on:
   schedule:
-    - cron: "*/15 7-20 * * 1-5"
+    - cron: "0 7 * * 1-5"
+    - cron: "45 12 * * 1-5"
+    - cron: "30 18 * * 1-5"
   workflow_dispatch:
 
 permissions:
@@ -19,25 +22,19 @@ concurrency:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 358
     steps:
       - uses: actions/checkout@v4
 
-      - name: Scan
+      - name: Scan every 30 s (alerts open an issue -> GitHub mobile push)
         env:
           TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
           SPREAD: ${{ vars.SPREAD || '2.5' }}
-        run: python3 scanner/scan.py --lookback-min 25 || [ $? -eq 2 ]
-
-      - name: Alert (opens an issue -> GitHub mobile push)
-        if: hashFiles('signals.md') != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          title="$(head -n1 signals.md)"
-          gh issue create --title "$title" --body-file signals.md --assignee "${{ github.repository_owner }}"
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scanner/scan.py --loop-min 350 --poll 30
 
       - name: Save signal log
+        if: always()
         run: |
           git add signals/log.csv 2>/dev/null || exit 0
           git diff --cached --quiet && exit 0

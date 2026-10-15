@@ -9,12 +9,14 @@ Finds the two setups the trade log supports, on closed 5m candles:
 Hard gates: weekend/stale data, 20:45-22:00 UTC rollover, 5m ATR > 8, 15m ATR > 20,
 stop wider than MAX_RISK. Short stops include spread (they trigger on the ask).
 
-Usage: python3 scanner/scan.py [--lookback-min 20] [--dry-run]
-Env:   TWELVE_DATA_API_KEY (required)
-Out:   prints a report; on signals writes signals.md + appends signals/log.csv and
-       exits 0. Exit 2 = gate/no data (not an error), 1 = fetch failure.
+Usage: python3 scanner/scan.py [--lookback-min 20] [--dry-run]       one scan
+       python3 scanner/scan.py --loop-min 350 [--poll 30]              live loop: checks every
+                                                                       30 s, scans each 5m close
+Env:   TWELVE_DATA_API_KEY (required); GITHUB_TOKEN + GITHUB_REPOSITORY to open an issue
+       per alert. SPREAD (default 2.5).
+Out:   appends new signals to signals/log.csv. Exit 2 = gate/no data, 1 = fetch failure.
 """
-import argparse, csv, json, os, sys, urllib.request
+import argparse, csv, json, os, sys, time, urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -155,35 +157,46 @@ def fmt(s):
             f"{MAX_DRIFT} pts of entry. Breakeven at +3 (shorts: SL to entry+2.5).")
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--lookback-min", type=int, default=20)
-    ap.add_argument("--dry-run", action="store_true")
-    a = ap.parse_args()
-    key = os.environ.get("TWELVE_DATA_API_KEY")
-    if not key:
-        print("ERROR TWELVE_DATA_API_KEY not set"); return 1
+def notify(alerts):
+    """Open a GitHub issue per alert (assigned to the owner -> GitHub mobile push)."""
+    token, repo = os.environ.get("GITHUB_TOKEN"), os.environ.get("GITHUB_REPOSITORY")
+    if not token or not repo:
+        return
+    for s in alerts:
+        body = fmt(s) + "\n\n_Rule-based scanner, not financial advice. Check news/calendar._"
+        data = json.dumps({"title": body.split("\n")[0], "body": body,
+                           "assignees": [repo.split("/")[0]]}).encode()
+        req = urllib.request.Request(f"https://api.github.com/repos/{repo}/issues", data=data, headers={
+            "Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"})
+        try:
+            urllib.request.urlopen(req, timeout=20).close()
+        except Exception as e:
+            print(f"ERROR could not open issue: {e}")
+
+
+def run_once(key, lookback_min, dry_run=False):
+    """Scan recently closed 5m candles. Returns (exit_code, last_closed_candle_time)."""
     now = datetime.now(timezone.utc)
     mins = now.hour * 60 + now.minute
     if 20 * 60 + 45 <= mins < 22 * 60:
-        print("GATE rollover window 20:45-22:00 UTC"); return 2
+        print("GATE rollover window 20:45-22:00 UTC"); return 2, None
     try:
         m5, h1, tv = candles("5min", 60, key), candles("1h", 40, key), tradingview()
     except Exception as e:
-        print(f"ERROR fetch failed: {e}"); return 1
+        print(f"ERROR fetch failed: {e}"); return 1, None
     m5 = [c for c in m5 if c["t"] + timedelta(minutes=5) <= now]   # closed candles only
     if not m5 or now - m5[-1]["t"] > timedelta(minutes=20):
-        print(f"GATE data stale (last candle {m5[-1]['t'] if m5 else 'none'}) - market closed?"); return 2
+        print(f"GATE data stale (last candle {m5[-1]['t'] if m5 else 'none'}) - market closed?"); return 2, None
     trend = trend_1h(h1)
     live = tv["close"]
-    print(f"{now:%Y-%m-%d %H:%M}Z price {live:.2f} | 1h trend {trend} | 5m ATR {tv['ATR|5']:.2f} "
-          f"15m ATR {tv['ATR|15']:.2f} | StochK {tv['Stoch.K|5']:.1f} CCI {tv['CCI20|5']:.0f} RSI {tv['RSI|5']:.1f}")
+    print(f"{now:%Y-%m-%d %H:%M:%S}Z price {live:.2f} | 1h trend {trend} | 5m ATR {tv['ATR|5']:.2f} "
+          f"15m ATR {tv['ATR|15']:.2f} | StochK {tv['Stoch.K|5']:.1f} CCI {tv['CCI20|5']:.0f} RSI {tv['RSI|5']:.1f}",
+          flush=True)
     if tv["ATR|5"] > ATR5_MAX or tv["ATR|15"] > ATR15_MAX:
-        print("GATE volatility too high for 5-pt scalps"); return 2
+        print("GATE volatility too high for 5-pt scalps"); return 2, m5[-1]["t"]
 
-    sigs = scan(m5, trend, now - timedelta(minutes=a.lookback_min))
     fresh = []
-    for s in sigs:
+    for s in scan(m5, trend, now - timedelta(minutes=lookback_min)):
         s["live"] = round(live, 2)
         if s["setup"] == "SWEEP" and s["with_trend"]:
             s["status"] = "skip: with-trend sweep (worst in backtest)"
@@ -193,18 +206,53 @@ def main():
             s["status"] = f"skip: price moved {live - s['entry']:+.1f} since signal"
         else:
             s["status"] = "ALERT"
-        print(f"  {s['status']:<34} {s['side']} {s['setup']} {s['time']} entry {s['entry']} sl {s['sl']}")
+        print(f"  {s['status']:<34} {s['side']} {s['setup']} {s['time']} entry {s['entry']} sl {s['sl']}", flush=True)
         if not already_logged(s):
             fresh.append(s)
-    if not fresh:
-        print("no new setups"); return 0
-    if not a.dry_run:
+    if fresh and not dry_run:
         log(fresh)
-        alerts = [s for s in fresh if s["status"] == "ALERT"]
-        if alerts:
-            (ROOT / "signals.md").write_text("\n\n".join(fmt(s) for s in alerts) +
-                                             "\n\n_Rule-based scanner, not financial advice. Check news/calendar._\n")
+        notify([s for s in fresh if s["status"] == "ALERT"])
+    return 0, m5[-1]["t"]
+
+
+def loop(key, poll, minutes, dry_run):
+    """Poll the live price every `poll` s; scan as soon as each 5m candle has closed."""
+    end = time.time() + minutes * 60
+    scanned, fails = None, 0
+    while time.time() < end:
+        now = datetime.now(timezone.utc)
+        if 20 * 60 + 45 <= now.hour * 60 + now.minute < 22 * 60:
+            print("STOP rollover window"); return 0
+        closed = now.replace(second=0, microsecond=0) - timedelta(minutes=now.minute % 5 + 5)
+        if closed != scanned:
+            code, last = run_once(key, 15 if scanned is None else 10, dry_run)
+            if code == 1:
+                fails += 1
+                if fails >= 5:
+                    return 1
+            else:
+                fails = 0
+            if code == 2 and last is None:
+                return 0                       # market closed / stale
+            if last is not None and last >= closed:
+                scanned = closed               # else Twelve Data not updated yet: retry next poll
+        time.sleep(poll)
     return 0
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--lookback-min", type=int, default=20)
+    ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--loop-min", type=int, default=0, help="keep polling for N minutes")
+    ap.add_argument("--poll", type=int, default=30, help="seconds between live checks in loop mode")
+    a = ap.parse_args()
+    key = os.environ.get("TWELVE_DATA_API_KEY")
+    if not key:
+        print("ERROR TWELVE_DATA_API_KEY not set"); return 1
+    if a.loop_min:
+        return loop(key, a.poll, a.loop_min, a.dry_run)
+    return run_once(key, a.lookback_min, a.dry_run)[0]
 
 
 if __name__ == "__main__":
