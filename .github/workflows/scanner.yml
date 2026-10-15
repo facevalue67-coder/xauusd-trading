@@ -1,0 +1,43 @@
+name: XAUUSD scanner
+
+# Live loop: wakes every second and scans each 5m candle as soon as it closes.
+# Mon-Fri 07:00-20:45 UTC in three back-to-back jobs (max job length is 6 h); the
+# concurrency group queues each job behind the previous one, so there is no gap.
+# ~14 h/day of runner time: free on a PUBLIC repo, far over the 2,000 free min on a private one.
+on:
+  schedule:
+    - cron: "0 7 * * 1-5"
+    - cron: "45 12 * * 1-5"
+    - cron: "30 18 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: scanner
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 358
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan live (1 s clock) (alerts open an issue -> GitHub mobile push)
+        env:
+          TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
+          SPREAD: ${{ vars.SPREAD || '2.5' }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scanner/scan.py --loop-min 350 --poll 1
+
+      - name: Save signal log
+        if: always()
+        run: |
+          git add signals/log.csv 2>/dev/null || exit 0
+          git diff --cached --quiet && exit 0
+          git -c user.name=xau-scanner -c user.email=actions@users.noreply.github.com \
+            commit -m "scanner: log signals [skip ci]"
+          git pull --rebase -q && git push -q
