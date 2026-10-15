@@ -3,7 +3,7 @@ import json, sys, time, urllib.request
 from datetime import datetime, timezone
 
 ENTRY, SL, TP1, TP2 = (float(x) for x in sys.argv[1:5])
-BE = ENTRY - 3.0
+BE = ENTRY - 4.0  # shorts: wait for +4, then SL to entry + 2.5 (spread)
 POLL, HEARTBEAT = 15, 300
 BODY = json.dumps({"symbols": {"tickers": ["TVC:GOLD"], "query": {"types": []}},
                    "columns": ["close", "high|5", "low|5"]}).encode()
@@ -36,7 +36,7 @@ while True:
         hi_after_be = max(hi_after_be, price, h5)
     if lo <= BE and "be" not in fired:
         fired.add("be"); hi_after_be = price
-        say(f"BREAKEVEN price reached {lo:.2f} (+{ENTRY-lo:.1f}) - move SL to {ENTRY:.2f}")
+        say(f"BREAKEVEN price reached {lo:.2f} (+{ENTRY-lo:.1f}) - move SL to {ENTRY+2.5:.2f} (entry + spread)")
     if lo <= TP1 and "tp1" not in fired:
         fired.add("tp1"); say(f"TP1 HIT {TP1} (price {price:.2f}) - take profit or trail SL to {ENTRY-2:.2f}")
     if lo <= TP2:
@@ -44,7 +44,7 @@ while True:
     if hi >= SL and "be" not in fired:
         say(f"STOP LOSS HIT {SL} (high {hi:.2f}) - trade closed"); sys.exit(0)
     if "be" in fired and hi_after_be >= ENTRY:
-        say(f"BREAKEVEN STOP hit: price back to {hi_after_be:.2f} - out at 0 if SL was moved"); sys.exit(0)
+        say(f"BREAKEVEN STOP hit: price back to {hi_after_be:.2f} - stopped near entry (~0) if SL was at entry + 2.5"); sys.exit(0)
     if hi >= SL - 1.5 and "be" not in fired and "nearsl" not in fired:
         fired.add("nearsl"); say(f"WARNING price {price:.2f} within 1.5 pts of SL {SL}")
     if time.time() - last_beat >= HEARTBEAT:

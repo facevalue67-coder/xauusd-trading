@@ -30,7 +30,7 @@ def signal(side, entry, sl, note):
     sys.exit(0)
 
 bucket, last, broke, fails, same, last_beat = None, None, False, 0, 0, 0
-say("START Oct15: pullback long 4130.5/4133.5 | short 4145/4142.5")
+say("START Oct15 #2: pullback long 4144.5/4146.5 | sweep short 4162.5/4159.5 | no signals 12:15-12:45")
 while True:
     now = datetime.now(timezone.utc)
     if now.hour >= 21 or (now.hour == 20 and now.minute >= 45):
@@ -46,16 +46,19 @@ while True:
     b = (now.hour * 60 + now.minute) // 5
     if bucket is not None and b != bucket and last:
         o, h, l, c = last["open|5"], last["high|5"], last["low|5"], last["close|5"]
-        if last["ATR|5"] and last["ATR|5"] > 8:
+        mins = now.hour * 60 + now.minute
+        if 12 * 60 + 15 <= mins < 12 * 60 + 45:
+            pass  # US data window - no signals
+        elif last["ATR|5"] and last["ATR|5"] > 8:
             say(f"GATE 5m ATR {last['ATR|5']:.2f} > 8 - no trade")
-        elif l <= 4130.5 and c >= 4133.5:
-            signal("LONG", c, min(l - 1.0, c - 6.0), "pullback to 4130-4132 support (1h EMA20 + session low), WITH 1h uptrend")
-        elif h >= 4145.0 and c <= 4142.5:
-            signal("SHORT", c, max(h + 1.0, c + 6.0), "rejection at 4145 (old support turned resistance), AGAINST 1h uptrend - lower confidence")
-        elif c >= 4148.0:
-            say(f"RECOVERY 5m closed {c:.2f} above 4148 - rally extending, reassess"); sys.exit(0)
-        elif c <= 4127.0:
-            say(f"BREAKDOWN 5m closed {c:.2f} below 4127 (1h EMA20 lost) - bounce failed, reassess"); sys.exit(0)
+        elif l <= 4144.5 and c >= 4146.5:
+            signal("LONG", c, min(l - 1.0, c - 6.0), "retest of broken 4145 resistance as support, WITH 1h uptrend")
+        elif h >= 4162.5 and c <= 4159.5:
+            signal("SHORT", c, max(h + 3.5, c + 6.0), "stop-hunt sweep of day high 4161.8, COUNTER-TREND (sweep only) - SL incl. spread")
+        elif c >= 4155.0:
+            say(f"EXTENDED 5m closed {c:.2f} above 4155 - no chase, reassess - rally extending, reassess"); sys.exit(0)
+        elif c <= 4139.0:
+            say(f"DROP 5m closed {c:.2f} below 4139 - bounce failed, reassess"); sys.exit(0)
     bucket = b
 
     same = same + 1 if last and s["close|5"] == last["close|5"] else 0
@@ -64,6 +67,6 @@ while True:
     last = s
     if time.time() - last_beat >= HEARTBEAT:
         last_beat = time.time()
-        say(f"HEARTBEAT [{'PULLBACK 4131-4145'}] price {s['close|5']:.2f} 5m H/L "
+        say(f"HEARTBEAT [{'UPTREND'}] price {s['close|5']:.2f} 5m H/L "
             f"{s['high|5']:.2f}/{s['low|5']:.2f} StochK {s['Stoch.K|5']:.1f} CCI {s['CCI20|5']:.0f}")
     time.sleep(POLL)

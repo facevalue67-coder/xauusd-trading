@@ -237,6 +237,12 @@ This is LLM-based analysis for testing only. Not financial advice.
 - Choppy/whipsaw action (alternating direction candles)
 - Wide spread candles (volatility too high)
 - Near session open/close (unpredictable)
+- **Counter-trend plain rejections** — against the 1h trend, only take a Stop Hunt Reversal (wick sweeps the level, then closes back). A plain rejection against the 1h trend lost (Trade #5).
+
+### Execution Rules (from the trade log)
+- **Short SL = wick high + 1 + spread (~2.5)**. A short's stop triggers on the ASK, so a stop placed 1-2 pts above the chart wick is effectively AT the wick. Long SL = wick low - 1 (bid = chart price). Skip if total risk > 8 pts.
+- **Never widen a stop mid-trade.** Accept the planned loss.
+- **Enter with a market order** on the signal (within the skip limit). Pending limits at the exact signal price missed twice — they need the chart to move a full spread past the level.
 
 ## Example Analysis Process
 
@@ -395,6 +401,27 @@ Rule: Experience log is for factual outcomes and lessons only. Do not rewrite pa
 - What Worked: Breakeven move turned a trade that came within 2.5 pts of SL into a scratch, not a loss
 - What Failed: A short's stop triggers on the ASK (chart bid + ~2-3 pt spread) - a breakeven stop at entry gets hit when the chart is still ~2-3 pts in profit; the retest was weak (price reclaimed the broken level for 15 min) inside a choppy range
 - Lesson: On shorts, place the breakeven stop at entry + spread (or wait until +4 to move it), and skip breakdown retests while price is still chopping inside the old range.
+
+### Trade #5 - 2026-10-15 07:50 UTC
+- Session: London open
+- Direction: SELL
+- Setup Type: Resistance Rejection at 4145 (old support turned resistance) - COUNTER-TREND vs 1h uptrend
+- Entry: ~4141.7 (market)
+- Stop Loss: 4147.7 (6 points), widened by user to 4148.5 while losing
+- TP1 / TP2: 4136.7 / 4131.7
+- Outcome: SL (chart high 4146.03 at 08:01 = ask ~4148.5)
+- Net Result (points): about -7 plus spread (~-9.5 effective)
+- Key Context: 1h trend up (EMAs stacked bullish, MACD hist positive), London-open push, watcher was offline 07:13-07:44 from a network drop, Stoch K 86 at entry
+- What Worked: Signal rules fired as designed; tracker alerted before the stop
+- What Failed: Plain rejection (no sweep) taken against the 1h trend at London open; short SL was only ~2.4 chart-pts above the wick high, i.e. ~0 after spread; SL widened mid-trade (bigger loss, same outcome)
+- Lesson: Counter-trend trades only on a confirmed stop-hunt sweep, never a plain rejection; short stops need wick high + 1 + spread; never widen a stop.
+
+### Running Review - 2026-10-15 (5 trades)
+- Wins: 2 (#2 TP1, #3 TP2) | Losses: 2 (#1, #5) | Breakeven: 1 (#4) | Missed fills: 2 (pending limit orders)
+- Gross points: about -5.5 +5 +10 0 -7 = +2.5
+- Best setup: Stop Hunt Reversal (sweep + close back) - 2/2 wins
+- Worst setup: entering at an obvious level without a sweep (#1) or against the 1h trend without a sweep (#5) - 0/2
+- Rule adjustments: (1) counter-trend = sweeps only; (2) short SL = wick high + 1 + spread; (3) never widen SL; (4) market orders on signal, no pending limits; (5) shorts: breakeven at +4 to entry + 2.5
 
 ## Setup
 
