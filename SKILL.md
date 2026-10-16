@@ -242,6 +242,7 @@ This is LLM-based analysis for testing only. Not financial advice.
 ### Execution Rules (from the trade log)
 - **Short SL = wick high + 1 + spread (~2.5)**. A short's stop triggers on the ASK, so a stop placed 1-2 pts above the chart wick is effectively AT the wick. Long SL = wick low - 1 (bid = chart price). Skip if total risk > 8 pts.
 - **Never widen a stop mid-trade.** Accept the planned loss.
+- **After TP1 is reached, the stop goes to entry + 2 at minimum.** On one 0.01 lot (no partial close), default to taking TP1; only hold for TP2 with the stop already locking +2 (Trade #6 reached +9.4 and closed at -0.8).
 - **Enter with a market order** on the signal (within the skip limit). Pending limits at the exact signal price missed twice — they need the chart to move a full spread past the level.
 
 ## Example Analysis Process
@@ -423,16 +424,16 @@ Rule: Experience log is for factual outcomes and lessons only. Do not rewrite pa
 - Entry: ~4153.5 (market, immediately)
 - Stop Loss: 4147.5 (6 points)
 - TP1 / TP2: 4158.5 / 4163.5
-- Outcome: TP1 (closed by user at ~4158.5 within ~2 min)
-- Net Result (points): +5 gross (~+2 to +3 net of spread)
+- Outcome: SL at 4152.64 (corrected 2026-10-16: user held for TP2 after TP1 was reached; price peaked ~4162.9, 0.6 short of TP2, then reversed; SL had been moved to 4152.64, just below entry, not to breakeven or +2)
+- Net Result (points): about -0.8 gross (~-3.3 net of spread)
 - Key Context: post-US-data (12:30 jobless claims) whipsaw 4130-4168; 5m ATR gate (>8) paused signals 13:20-13:30, signal fired once ATR dipped to ~7.9; 1h trend up
 - What Worked: Waited out the news chop and the ATR gate; with-trend retest (the backtest's best group); market entry filled at the signal price
-- What Failed: Nothing on the trade; ATR was still near the 8 limit, so the move was fast in both directions
-- Lesson: With-trend pullbacks to the 5m EMA cluster after a news spike settles are clean - and TP1 hits fast in high ATR, so take it.
+- What Failed: Held a 0.01 lot (can't partial close) for TP2 instead of banking TP1; after +9.4 the stop was still below entry, so a +9 trade became a small loss; TP2 sat just above the day's old high (4161.8), a natural stall zone
+- Lesson: On a single 0.01 lot, take TP1 - or once TP1 is reached, trail the stop to at least +2 (entry + 2). Never let a trade that reached TP1 close at a loss.
 
 ### Running Review - 2026-10-15 (6 trades)
-- Wins: 3 (#2 TP1, #3 TP2, #6 TP1) | Losses: 2 (#1, #5) | Breakeven: 1 (#4) | Missed fills: 2 (pending limit orders)
-- Gross points: about -5.5 +5 +10 0 -7 +5 = +7.5 (net of ~2.5 spread x 6 trades: about -7.5)
+- Wins: 2 (#2 TP1, #3 TP2) | Losses: 3 (#1, #5, #6 small) | Breakeven: 1 (#4) | Missed fills: 2 (pending limit orders)
+- Gross points: about -5.5 +5 +10 0 -7 -0.8 = +1.7 (net of ~2.5 spread x 6 trades: about -13)
 - Backtest warning (scanner/backtest.py, 173 trades, 2026-09-28 to 10-15): -1.85 pts/trade at 2.5 spread; best group = with-trend retests; edge depends on real spread
 - Best setup: Stop Hunt Reversal (sweep + close back) - 2/2 wins
 - Worst setup: entering at an obvious level without a sweep (#1) or against the 1h trend without a sweep (#5) - 0/2
